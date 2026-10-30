@@ -1,0 +1,73 @@
+[
+  {
+    "variant": "Zero-Shot #1",
+    "status": "tested",
+    "passed": 9,
+    "failed": 0,
+    "average_call_time_seconds": 9.338200000001962e-07,
+    "errors": []
+  },
+  {
+    "variant": "Zero-Shot #2",
+    "status": "runtime error",
+    "passed": 0,
+    "failed": 9,
+    "average_call_time_seconds": null
+  },
+  {
+    "variant": "Zero-Shot #3",
+    "status": "tested",
+    "passed": 9,
+    "failed": 0,
+    "average_call_time_seconds": 2.139409999972486e-06,
+    "errors": []
+  },
+  {
+    "variant": "Few-Shot #1",
+    "status": "tested",
+    "passed": 7,
+    "failed": 2,
+    "average_call_time_seconds": 1.117030000023078e-06,
+    "errors": []
+  },
+  {
+    "variant": "Few-Shot #2",
+    "status": "tested",
+    "passed": 7,
+    "failed": 2,
+    "average_call_time_seconds": 6.122099999629426e-07,
+    "errors": []
+  },
+  {
+    "variant": "Few-Shot #3",
+    "status": "tested",
+    "passed": 7,
+    "failed": 2,
+    "average_call_time_seconds": 6.629599999996572e-07,
+    "errors": []
+  },
+  {
+    "variant": "Chain-of-Thought #1",
+    "status": "tested",
+    "passed": 7,
+    "failed": 2,
+    "average_call_time_seconds": 1.332410000031814e-06,
+    "errors": []
+  },
+  {
+    "variant": "Chain-of-Thought #2",
+    "status": "tested",
+    "passed": 9,
+    "failed": 0,
+    "average_call_time_seconds": 1.048590000027616e-06,
+    "errors": []
+  },
+  {
+    "variant": "Chain-of-Thought #3",
+    "status": "tested",
+    "passed": 9,
+    "failed": 0,
+    "average_call_time_seconds": 1.033690000031129e-06,
+    "errors": []
+  }
+]
