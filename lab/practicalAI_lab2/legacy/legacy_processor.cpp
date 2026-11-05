@@ -294,10 +294,10 @@ LoanResult processLoan(const LoanInput& input, LoanSystemState& state) {
     calculateServiceCommission(rules, input, state.settings, result);
     applyEarlyRepayment(rules, input, result);
 
-    result.totalAmount = input.amount 
-                         + result.totalInterest 
-                         + result.commission 
-                         + result.insuranceCost 
+    result.totalAmount = input.amount
+                         + result.totalInterest
+                         + result.commission
+                         + result.insuranceCost
                          + result.additionalFee;
 
     result.success = true;
