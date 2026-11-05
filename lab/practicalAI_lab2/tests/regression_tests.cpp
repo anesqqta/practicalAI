@@ -1,9 +1,9 @@
 #include <iostream>
-#include <iomanip>
-#include <sstream>
 #include <string>
+#include <sstream>
 #include <cmath>
-#include <clocale> 
+#include <iomanip>
+#include <clocale>
 #include <windows.h>
 
 #define main legacy_program_main
@@ -12,143 +12,142 @@
 
 using namespace std;
 
-// Скидання глобальних змінних перед кожним тестом
-void resetGlobals() {
-    totalProcessed = 0.0;
-    processedLoans = 0;
-    useInsurance = true;
-    insuranceRate = 0.025;
-    processingFee = 0.015;
-}
-
-// Виклик функції з перехопленням консольного виводу
-string captureOutput(
-    const string& loanType,
-    double amount,
-    double annualRate,
-    int months,
-    bool earlyRepayment,
-    bool insurance,
-    double& result
-) {
-    ostringstream capturedOutput;
-    streambuf* oldBuffer = cout.rdbuf(capturedOutput.rdbuf());
-
-    result = processLoan(
-        loanType,
-        amount,
-        annualRate,
-        months,
-        earlyRepayment,
-        insurance
-    );
-
-    cout.rdbuf(oldBuffer);
-
-    return capturedOutput.str();
-}
-
-// Перевірка одного тестового випадку
+// Виконання одного регресійного тесту
 bool runTest(
-    const string& id,
-    const string& loanType,
-    double amount,
-    double rate,
-    int months,
-    bool earlyRepayment,
-    bool insurance,
-    double expectedResult,
+    const string& testName,
+    const LoanInput& input,
+    double expectedAmount,
     int expectedProcessedLoans
 ) {
-    resetGlobals();
+    // Окремий стан системи для кожного тесту
+    LoanSystemState state;
 
-    double actualResult = 0.0;
+    // Перехоплення повідомлень програми
+    ostringstream output;
+    streambuf* oldCout = cout.rdbuf(output.rdbuf());
 
-    string output = captureOutput(
-        loanType,
-        amount,
-        rate,
-        months,
-        earlyRepayment,
-        insurance,
-        actualResult
-    );
+    LoanResult result = processLoan(input, state);
 
-    bool resultCorrect = abs(actualResult - expectedResult) < 0.01;
-    bool counterCorrect = processedLoans == expectedProcessedLoans;
-    
-    // Якщо очікуваний результат від'ємний (-1.00), глобальна сума залишається 0.00
-    double expectedTotal = (expectedResult < 0) ? 0.00 : expectedResult;
-    bool totalCorrect = abs(totalProcessed - expectedTotal) < 0.01;
+    // Відновлення стандартного виведення
+    cout.rdbuf(oldCout);
 
-    bool testPassed = resultCorrect && counterCorrect && totalCorrect;
+    double actualAmount = result.success ? result.totalAmount : -1.0;
 
-    cout << id << " | "
-         << (testPassed ? "PASSED" : "FAILED")
-         << " | actual = " << actualResult
-         << " | expected = " << expectedResult
-         << " | processedLoans = " << processedLoans
-         << '\n';
+    bool amountCorrect = fabs(actualAmount - expectedAmount) < 0.01;
+    bool statisticsCorrect = state.statistics.processedLoans == expectedProcessedLoans;
 
-    if (!testPassed) {
-        cout << " Помилка перевірки:";
+    double expectedTotalProcessed = expectedProcessedLoans > 0 ? expectedAmount : 0.0;
+    bool totalProcessedCorrect = fabs(state.statistics.totalProcessed - expectedTotalProcessed) < 0.01;
 
-        if (!resultCorrect)
-            cout << " результат";
+    bool testPassed = amountCorrect && statisticsCorrect && totalProcessedCorrect;
 
-        if (!counterCorrect)
-            cout << " кількість оброблених кредитів";
+    cout << testName << ": ";
 
-        if (!totalCorrect)
-            cout << " загальна сума";
-
-        cout << '\n';
+    if (testPassed) {
+        cout << "PASSED";
     }
+    else {
+        cout << "FAILED"
+             << " | Очікувана сума: " << expectedAmount
+             << " | Фактична сума: " << actualAmount
+             << " | Оброблено кредитів: " << state.statistics.processedLoans;
+    }
+
+    cout << endl;
+
+    return testPassed;
+}
+
+// Перевірка відхилення невідомого типу кредиту
+bool testUnknownLoanType() {
+    LoanType type;
+
+    bool result = parseLoanType("UNKNOWN", type);
+    bool testPassed = !result;
+
+    cout << "TC16: ";
+
+    if (testPassed) {
+        cout << "PASSED";
+    }
+    else {
+        cout << "FAILED";
+    }
+
+    cout << endl;
 
     return testPassed;
 }
 
 int main() {
+
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
     setlocale(LC_ALL, "Ukrainian_Ukraine.65001");
+    
+    int totalTests = 16;
+    int passedTests = 0;
 
-    cout << fixed << setprecision(2);
+    cout << "===== РЕГРЕСІЙНЕ ТЕСТУВАННЯ =====" << endl;
 
-    cout << "=== РЕГРЕСІЙНЕ ТЕСТУВАННЯ ===\n\n";
+    // TC01: Споживчий кредит без дострокового погашення та страхування
+    passedTests += runTest("TC01", {LoanType::Consumer, 50000, 18, 24, false, false}, 62158.92, 1);
 
-    int passed = 0;
-    int failed = 0;
+    // TC02: Іпотечний кредит
+    passedTests += runTest("TC02", {LoanType::Mortgage, 800000, 12, 120, false, false}, 1398821.10, 1);
 
-    // Коректні вхідні дані
-    if (runTest("TC01", "CONSUMER", 50000,   18,  24,  false, false, 62158.92,   1)) passed++; else failed++;
-    if (runTest("TC02", "MORTGAGE", 800000,  12,  120, false, false, 1398821.10, 1)) passed++; else failed++;
-    if (runTest("TC03", "AUTO",     300000,  16,  60,  false, false, 452025.03,  1)) passed++; else failed++;
-    if (runTest("TC04", "CONSUMER", 12000,    0,  12,  false, false, 12920.00,   1)) passed++; else failed++;
-    if (runTest("TC05", "CONSUMER", 50000,   18,  24,  false, true,  63408.92,   1)) passed++; else failed++;
-    if (runTest("TC06", "MORTGAGE", 800000,  12,  120, true,  true,  1386455.05, 1)) passed++; else failed++;
-    if (runTest("TC07", "AUTO",     300000,  16,  60,  true,  false, 431666.27,  1)) passed++; else failed++;
-    if (runTest("TC08", "CONSUMER", 10000,   10,  1,   false, false, 10933.33,   1)) passed++; else failed++;
-    if (runTest("TC09", "MORTGAGE", 500000,  10,  360, false, false, 1594378.83, 1)) passed++; else failed++;
+    // TC03: Автокредит
+    passedTests += runTest("TC03", {LoanType::Auto, 300000, 16, 60, false, false}, 452025.03, 1);
 
-    // Некоректні вхідні дані
-    if (runTest("TC10", "CONSUMER", 0,       10,  12,  false, false, -1.00,       0)) passed++; else failed++;
-    if (runTest("TC11", "CONSUMER", -10000,  10,  12,  false, false, -1.00,       0)) passed++; else failed++;
-    if (runTest("TC12", "CONSUMER", 10000,   -1,  12,  false, false, -1.00,       0)) passed++; else failed++;
-    if (runTest("TC13", "CONSUMER", 10000,   101, 12,  false, false, -1.00,       0)) passed++; else failed++;
-    if (runTest("TC14", "CONSUMER", 10000,   10,  0,   false, false, -1.00,       0)) passed++; else failed++;
-    if (runTest("TC15", "CONSUMER", 10000,   10,  361, false, false, -1.00,       0)) passed++; else failed++;
-    if (runTest("TC16", "UNKNOWN",  10000,   10,  12,  false, false, -1.00,       0)) passed++; else failed++;
+    // TC04: Кредит з нульовою відсотковою ставкою
+    passedTests += runTest("TC04", {LoanType::Consumer, 12000, 0, 12, false, false}, 12920.00, 1);
 
-    cout << "\n=== ПІДСУМКИ ТЕСТУВАННЯ ===\n";
-    cout << "Усього тестів: " << passed + failed << '\n';
-    cout << "Успішно: " << passed << '\n';
-    cout << "Не пройдено: " << failed << '\n';
+    // TC05: Споживчий кредит зі страхуванням
+    passedTests += runTest("TC05", {LoanType::Consumer, 50000, 18, 24, false, true}, 63408.92, 1);
 
-    if (failed == 0)
-        cout << "\nУсі регресійні тести пройдено успішно!\n";
-    else
-        cout << "\nВиявлено помилки під час тестування!\n";
+    // TC06: Іпотечний кредит з достроковим погашенням і страхуванням
+    passedTests += runTest("TC06", {LoanType::Mortgage, 800000, 12, 120, true, true}, 1386455.05, 1);
 
-    return failed == 0 ? 0 : 1;
+    // TC07: Автокредит з достроковим погашенням
+    passedTests += runTest("TC07", {LoanType::Auto, 300000, 16, 60, true, false}, 431666.27, 1);
+
+    // TC08: Кредит на один місяць
+    passedTests += runTest("TC08", {LoanType::Consumer, 10000, 10, 1, false, false}, 10933.33, 1);
+
+    // TC09: Кредит на максимальний термін
+    passedTests += runTest("TC09", {LoanType::Mortgage, 500000, 10, 360, false, false}, 1594378.83, 1);
+
+    // TC10: Нульова сума кредиту
+    passedTests += runTest("TC10", {LoanType::Consumer, 0, 10, 12, false, false}, -1.0, 0);
+
+    // TC11: Від'ємна сума кредиту
+    passedTests += runTest("TC11", {LoanType::Consumer, -10000, 10, 12, false, false}, -1.0, 0);
+
+    // TC12: Від'ємна відсоткова ставка
+    passedTests += runTest("TC12", {LoanType::Consumer, 10000, -1, 12, false, false}, -1.0, 0);
+
+    // TC13: Відсоткова ставка понад 100%
+    passedTests += runTest("TC13", {LoanType::Consumer, 10000, 101, 12, false, false}, -1.0, 0);
+
+    // TC14: Нульовий термін кредитування
+    passedTests += runTest("TC14", {LoanType::Consumer, 10000, 10, 0, false, false}, -1.0, 0);
+
+    // TC15: Термін кредитування понад 360 місяців
+    passedTests += runTest("TC15", {LoanType::Consumer, 10000, 10, 361, false, false}, -1.0, 0);
+
+    // TC16: Невідомий тип кредиту
+    passedTests += testUnknownLoanType();
+
+    cout << "\n===== ПІДСУМКИ ТЕСТУВАННЯ =====" << endl;
+    cout << "Усього тестів: " << totalTests << endl;
+    cout << "Успішно: " << passedTests << endl;
+    cout << "Не пройдено: " << totalTests - passedTests << endl;
+
+    if (passedTests == totalTests) {
+        cout << "\nУсі регресійні тести пройдено успішно!" << endl;
+        return 0;
+    }
+
+    cout << "\nВиявлено помилки під час тестування!" << endl;
+    return 1;
 }

@@ -1,0 +1,24 @@
+﻿===== РЕГРЕСІЙНЕ ТЕСТУВАННЯ =====
+TC01: PASSED
+TC02: PASSED
+TC03: PASSED
+TC04: PASSED
+TC05: PASSED
+TC06: PASSED
+TC07: PASSED
+TC08: PASSED
+TC09: PASSED
+TC10: PASSED
+TC11: PASSED
+TC12: PASSED
+TC13: PASSED
+TC14: PASSED
+TC15: PASSED
+TC16: PASSED
+
+===== ПІДСУМКИ ТЕСТУВАННЯ =====
+Усього тестів: 16
+Успішно: 16
+Не пройдено: 0
+
+Усі регресійні тести пройдено успішно!
