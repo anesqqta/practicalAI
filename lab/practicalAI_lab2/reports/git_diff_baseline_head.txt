@@ -1,0 +1,677 @@
+diff --git a/lab/practicalAI_lab2/legacy/legacy_processor.cpp b/lab/practicalAI_lab2/legacy/legacy_processor.cpp
+index 5d71d84..19ff138 100644
+--- a/lab/practicalAI_lab2/legacy/legacy_processor.cpp
++++ b/lab/practicalAI_lab2/legacy/legacy_processor.cpp
+@@ -1,204 +1,325 @@
+ #include <iostream>
+ #include <string>
+ #include <iomanip>
+-#include <clocale>
+-#include <windows.h>// Необхідно для підтримки української мови в консолі
++#include <clocale>
++#include <windows.h>
+
+ using namespace std;
+
+-// Глобальні змінні
+-double insuranceRate = 0.025; // Базова ставка страхування
+-double processingFee = 0.015; // Комісія за обробку
+-double totalProcessed = 0.0;  // Загальна сума оброблених кредитів
+-int processedLoans = 0;       // Кількість оброблених кредитів
+-bool useInsurance = true;     // Чи використовувати страхування загалом
++// Фіксовані категорії кредитів
++enum class LoanType {
++    Consumer,
++    Mortgage,
++    Auto
++};
++
++// Налаштування системи кредитування
++struct LoanSettings {
++    double insuranceRate = 0.025;
++    double processingFee = 0.015;
++    bool useInsurance = true;
++};
++
++// Статистика обробки кредитів
++struct LoanStatistics {
++    double totalProcessed = 0.0;
++    int processedLoans = 0;
++};
++
++// Єдиний об'єкт стану системи
++struct LoanSystemState {
++    LoanSettings settings;
++    LoanStatistics statistics;
++};
++
++// Вхідні параметри кредиту
++struct LoanInput {
++    LoanType type;
++    double amount;
++    double annualRate;
++    int months;
++    bool earlyRepayment;
++    bool insurance;
++};
++
++// Правила розрахунку для окремого типу кредиту
++struct LoanRules {
++    double commissionRate;
++    double amountThreshold;
++    double increasedCommissionRate;
++
++    double baseAdditionalFee;
++    double rateThreshold;
++    double rateAdditionalFee;
++
++    double insuranceMultiplier;
+
+-// Функція розрахунку параметрів кредиту
+-double processLoan(string loanType, double amount, double annualRate, int months, bool earlyRepayment, bool insurance) {
++    int serviceMonthsThreshold;
++    double serviceAdditionalFee;
++
++    double earlyRepaymentFactor;
++    double earlyRepaymentFee;
++};
++
++// Результати розрахунку кредиту
++struct LoanResult {
+     double monthlyPayment = 0.0;
+     double totalInterest = 0.0;
+     double commission = 0.0;
+     double insuranceCost = 0.0;
+     double additionalFee = 0.0;
+     double totalAmount = 0.0;
+-    double monthlyRate = annualRate / 12.0 / 100.0;
++    bool success = false;
++};
++
++// Перетворення рядкового позначення на тип кредиту
++bool parseLoanType(const string& value, LoanType& type) {
++    if (value.empty()) {
++        return false;
++    }
++
++    switch (value[0]) {
++        case 'C':
++            if (value == "CONSUMER") {
++                type = LoanType::Consumer;
++                return true;
++            }
++            break;
++
++        case 'M':
++            if (value == "MORTGAGE") {
++                type = LoanType::Mortgage;
++                return true;
++            }
++            break;
++
++        case 'A':
++            if (value == "AUTO") {
++                type = LoanType::Auto;
++                return true;
++            }
++            break;
++
++        default:
++            return false;
++    }
++
++    return false;
++}
++
++// Отримання текстової назви типу кредиту
++string loanTypeToString(LoanType type) {
++    switch (type) {
++        case LoanType::Consumer: return "CONSUMER";
++        case LoanType::Mortgage: return "MORTGAGE";
++        case LoanType::Auto:     return "AUTO";
++    }
++    return "UNKNOWN";
++}
++
++// Отримання параметрів відповідно до типу кредиту
++bool getLoanRules(LoanType type, LoanRules& rules) {
++    switch (type) {
++        case LoanType::Consumer:
++            rules = {
++                0.02, 100000, 0.025,
++                500,  20,     300,
++                1.0,  60,     250,
++                0.9,  200
++            };
++            break;
++
++        case LoanType::Mortgage:
++            rules = {
++                0.01, 1000000, 0.015,
++                1500, 15,      1000,
++                0.8,  120,     750,
++                0.95, 500
++            };
++            break;
++
++        case LoanType::Auto:
++            rules = {
++                0.03, 500000, 0.035,
++                800,  18,     500,
++                1.2,  84,     400,
++                0.85, 300
++            };
++            break;
++
++        default:
++            return false;
++    }
+
+-    // Валідація вхідних даних
+-    if (amount <= 0) {
++    return true;
++}
++
++// Перевірка коректності вхідних даних
++bool validateLoanInput(const LoanInput& input) {
++    if (input.amount <= 0) {
+         cout << "Помилка: сума кредиту повинна бути додатною." << endl;
+-        return -1;
++        return false;
+     }
+
+-    if (annualRate < 0 || annualRate > 100) {
++    if (input.annualRate < 0 || input.annualRate > 100) {
+         cout << "Помилка: некоректна відсоткова ставка." << endl;
+-        return -1;
++        return false;
+     }
+
+-    if (months <= 0 || months > 360) {
++    if (input.months <= 0 || input.months > 360) {
+         cout << "Помилка: некоректний термін кредитування." << endl;
+-        return -1;
++        return false;
+     }
+
+-    if (loanType != "CONSUMER" && loanType != "MORTGAGE" && loanType != "AUTO") {
+-        cout << "Помилка: невідомий тип кредиту." << endl;
+-        return -1;
++    return true;
++}
++
++// Розрахунок початкової комісії та додаткових зборів
++void calculateLoanTypeFees(const LoanRules& rules, const LoanInput& input, LoanResult& result) {
++    result.commission = input.amount * rules.commissionRate;
++    result.additionalFee = rules.baseAdditionalFee;
++
++    if (input.annualRate > rules.rateThreshold) {
++        result.additionalFee += rules.rateAdditionalFee;
+     }
+
+-    // Обробка логіки залежно від типу кредиту
+-    if (loanType == "CONSUMER") {
+-        commission = amount * 0.02;
+-        additionalFee = 500;
++    if (input.amount > rules.amountThreshold) {
++        result.commission = input.amount * rules.increasedCommissionRate;
++    }
++}
+
+-        if (annualRate > 20) {
+-            additionalFee += 300;
+-        }
++// Розрахунок щомісячного платежу
++double calculateMonthlyPayment(double amount, double monthlyRate, int months) {
++    if (monthlyRate == 0) {
++        return amount / months;
++    }
+
+-        if (amount > 100000) {
+-            commission = amount * 0.025;
+-        }
+-    }
+-    else if (loanType == "MORTGAGE") {
+-        commission = amount * 0.01;
+-        additionalFee = 1500;
++    double denominator = 1;
+
+-        if (annualRate > 15) {
+-            additionalFee += 1000;
+-        }
++    for (int i = 0; i < months - 1; i++) {
++        denominator *= (1 + monthlyRate);
++    }
+
+-        if (amount > 1000000) {
+-            commission = amount * 0.015;
+-        }
+-    }
+-    else if (loanType == "AUTO") {
+-        commission = amount * 0.03;
+-        additionalFee = 800;
++    double power = denominator * (1 + monthlyRate);
+
+-        if (annualRate > 18) {
+-            additionalFee += 500;
+-        }
++    return amount * monthlyRate * power / (power - 1);
++}
+
+-        if (amount > 500000) {
+-            commission = amount * 0.035;
+-        }
++// Розрахунок вартості страхування
++double calculateInsurance(const LoanRules& rules, const LoanInput& input, const LoanSettings& settings) {
++    if (input.insurance && settings.useInsurance) {
++        return input.amount * settings.insuranceRate * rules.insuranceMultiplier;
+     }
+
+-    // Розрахунок щомісячного платежу
+-    if (monthlyRate == 0) {
+-        monthlyPayment = amount / months;
+-    }
+-    else {
+-        double coefficient = monthlyRate * (1 + monthlyRate);
+-        double denominator = 1;
+-
+-        for (int i = 0; i < months - 1; i++) {
+-            denominator *= (1 + monthlyRate);
+-        }
+-
+-        double power = denominator * (1 + monthlyRate);
+-        monthlyPayment = amount * monthlyRate * power / (power - 1);
+-    }
+-
+-    totalInterest = monthlyPayment * months - amount;
+-
+-    // Розрахунок страховки
+-    if (insurance && useInsurance) {
+-        if (loanType == "CONSUMER") {
+-            insuranceCost = amount * insuranceRate;
+-        }
+-        else if (loanType == "MORTGAGE") {
+-            insuranceCost = amount * insuranceRate * 0.8;
+-        }
+-        else if (loanType == "AUTO") {
+-            insuranceCost = amount * insuranceRate * 1.2;
+-        }
+-    }
+-
+-    // Розрахунок додаткових комісій за обслуговування терміну
+-    if (loanType == "CONSUMER") {
+-        commission += amount * processingFee;
+-
+-        if (months > 60) {
+-            commission += 250;
+-        }
+-    }
+-    else if (loanType == "MORTGAGE") {
+-        commission += amount * processingFee;
+-
+-        if (months > 120) {
+-            commission += 750;
+-        }
+-    }
+-    else if (loanType == "AUTO") {
+-        commission += amount * processingFee;
+-
+-        if (months > 84) {
+-            commission += 400;
+-        }
+-    }
+-
+-    // Обробка умов дострокового погашення
+-    if (earlyRepayment) {
+-        if (loanType == "CONSUMER") {
+-            totalInterest *= 0.9;
+-            additionalFee += 200;
+-        }
+-        else if (loanType == "MORTGAGE") {
+-            totalInterest *= 0.95;
+-            additionalFee += 500;
+-        }
+-        else if (loanType == "AUTO") {
+-            totalInterest *= 0.85;
+-            additionalFee += 300;
+-        }
+-    }
+-
+-    // Розрахунок фінальної суми до сплати
+-    totalAmount = amount + totalInterest + commission + insuranceCost + additionalFee;
+-
+-    if (totalAmount > amount * 2) {
++    return 0.0;
++}
++
++// Комісія за обслуговування терміну кредиту
++void calculateServiceCommission(
++    const LoanRules& rules,
++    const LoanInput& input,
++    const LoanSettings& settings,
++    LoanResult& result
++) {
++    result.commission += input.amount * settings.processingFee;
++
++    if (input.months > rules.serviceMonthsThreshold) {
++        result.commission += rules.serviceAdditionalFee;
++    }
++}
++
++// Обробка дострокового погашення
++void applyEarlyRepayment(const LoanRules& rules, const LoanInput& input, LoanResult& result) {
++    if (input.earlyRepayment) {
++        result.totalInterest *= rules.earlyRepaymentFactor;
++        result.additionalFee += rules.earlyRepaymentFee;
++    }
++}
++
++// Виведення результатів розрахунку
++void printLoanResult(const LoanInput& input, const LoanResult& result) {
++    if (result.totalAmount > input.amount * 2) {
+         cout << "Увага: загальна вартість кредиту перевищує тіло кредиту вдвічі!" << endl;
+     }
+
+-    if (insuranceCost > 0) {
++    if (result.insuranceCost > 0) {
+         cout << "Страхування включено." << endl;
+-    }
++    }
+     else {
+         cout << "Страхування не включено." << endl;
+     }
+
+-    if (earlyRepayment) {
++    if (input.earlyRepayment) {
+         cout << "Застосовано опцію дострокового погашення." << endl;
+-    }
++    }
+     else {
+         cout << "Стандартні умови погашення." << endl;
+     }
+
+-    // Оновлення глобальної статистики
+-    totalProcessed += totalAmount;
+-    processedLoans++;
+-
+     cout << fixed << setprecision(2);
+     cout << "\n----- РОЗРАХУНОК КРЕДИТУ -----" << endl;
+-    cout << "Тип кредиту: " << loanType << endl;
+-    cout << "Тіло кредиту (сума): " << amount << endl;
+-    cout << "Щомісячний платіж: " << monthlyPayment << endl;
+-    cout << "Загальні відсотки: " << totalInterest << endl;
+-    cout << "Комісія: " << commission << endl;
+-    cout << "Страховка: " << insuranceCost << endl;
+-    cout << "Додаткові збори: " << additionalFee << endl;
+-    cout << "Загальна сума до сплати: " << totalAmount << endl;
+-
+-    return totalAmount;
++    cout << "Тип кредиту: " << loanTypeToString(input.type) << endl;
++    cout << "Тіло кредиту (сума): " << input.amount << endl;
++    cout << "Щомісячний платіж: " << result.monthlyPayment << endl;
++    cout << "Загальні відсотки: " << result.totalInterest << endl;
++    cout << "Комісія: " << result.commission << endl;
++    cout << "Страховка: " << result.insuranceCost << endl;
++    cout << "Додаткові збори: " << result.additionalFee << endl;
++    cout << "Загальна сума до сплати: " << result.totalAmount << endl;
++}
++
++// Основна функція обробки кредиту
++LoanResult processLoan(const LoanInput& input, LoanSystemState& state) {
++    LoanResult result;
++
++    if (!validateLoanInput(input)) {
++        return result;
++    }
++
++    LoanRules rules;
++
++    if (!getLoanRules(input.type, rules)) {
++        cout << "Помилка: невідомий тип кредиту." << endl;
++        return result;
++    }
++
++    double monthlyRate = input.annualRate / 12.0 / 100.0;
++
++    calculateLoanTypeFees(rules, input, result);
++
++    result.monthlyPayment = calculateMonthlyPayment(input.amount, monthlyRate, input.months);
++    result.totalInterest = result.monthlyPayment * input.months - input.amount;
++    result.insuranceCost = calculateInsurance(rules, input, state.settings);
++
++    calculateServiceCommission(rules, input, state.settings, result);
++    applyEarlyRepayment(rules, input, result);
++
++    result.totalAmount = input.amount
++                         + result.totalInterest
++                         + result.commission
++                         + result.insuranceCost
++                         + result.additionalFee;
++
++    result.success = true;
++
++    // Оновлення статистики через переданий об'єкт стану
++    state.statistics.totalProcessed += result.totalAmount;
++    state.statistics.processedLoans++;
++
++    printLoanResult(input, result);
++
++    return result;
+ }
+
+ int main() {
+-    // Встановлення української локалі для коректного виведення в консоль
+-    // Повний запуск підтримки UTF-8 для Windows
++    // Створення локального об'єкта стану системи
++    LoanSystemState state;
++
++    // Встановлення української локалі для коректного виведення
+     SetConsoleCP(65001);
+     SetConsoleOutputCP(65001);
+     setlocale(LC_ALL, "Ukrainian_Ukraine.65001");
+
+-
+     cout << "=== СИСТЕМА РОЗРАХУНКУ КРЕДИТІВ ===" << endl;
+
+     double amount;
+@@ -229,17 +350,33 @@ int main() {
+     bool earlyRepayment = (earlyChoice == 'y' || earlyChoice == 'Y');
+     bool insurance = (insuranceChoice == 'y' || insuranceChoice == 'Y');
+
+-    double result = processLoan(type, amount, rate, months, earlyRepayment, insurance);
++    LoanType loanType;
++
++    if (!parseLoanType(type, loanType)) {
++        cout << "Помилка: невідомий тип кредиту." << endl;
++        return 1;
++    }
++
++    LoanInput input = {
++        loanType,
++        amount,
++        rate,
++        months,
++        earlyRepayment,
++        insurance
++    };
++
++    LoanResult result = processLoan(input, state);
+
+-    if (result > 0) {
++    if (result.success) {
+         cout << "\nРозрахунок завершено успішно." << endl;
+-    }
++    }
+     else {
+         cout << "\nПомилка розрахунку." << endl;
+     }
+
+-    cout << "\nОброблено кредитів: " << processedLoans << endl;
+-    cout << "Загальна сума всіх оброблених кредитів: " << totalProcessed << endl;
++    cout << "\nОброблено кредитів: " << state.statistics.processedLoans << endl;
++    cout << "Загальна сума всіх оброблених кредитів: " << state.statistics.totalProcessed << endl;
+
+-    return 0;
+-}
++     return 0;
++}
+\ No newline at end of file
+diff --git a/lab/practicalAI_lab2/tests/regression_tests.cpp b/lab/practicalAI_lab2/tests/regression_tests.cpp
+new file mode 100644
+index 0000000..09de191
+--- /dev/null
++++ b/lab/practicalAI_lab2/tests/regression_tests.cpp
+@@ -0,0 +1,153 @@
++#include <iostream>
++#include <string>
++#include <sstream>
++#include <cmath>
++#include <iomanip>
++#include <clocale>
++#include <windows.h>
++
++#define main legacy_program_main
++#include "../legacy/legacy_processor.cpp"
++#undef main
++
++using namespace std;
++
++// Виконання одного регресійного тесту
++bool runTest(
++    const string& testName,
++    const LoanInput& input,
++    double expectedAmount,
++    int expectedProcessedLoans
++) {
++    // Окремий стан системи для кожного тесту
++    LoanSystemState state;
++
++    // Перехоплення повідомлень програми
++    ostringstream output;
++    streambuf* oldCout = cout.rdbuf(output.rdbuf());
++
++    LoanResult result = processLoan(input, state);
++
++    // Відновлення стандартного виведення
++    cout.rdbuf(oldCout);
++
++    double actualAmount = result.success ? result.totalAmount : -1.0;
++
++    bool amountCorrect = fabs(actualAmount - expectedAmount) < 0.01;
++    bool statisticsCorrect = state.statistics.processedLoans == expectedProcessedLoans;
++
++    double expectedTotalProcessed = expectedProcessedLoans > 0 ? expectedAmount : 0.0;
++    bool totalProcessedCorrect = fabs(state.statistics.totalProcessed - expectedTotalProcessed) < 0.01;
++
++    bool testPassed = amountCorrect && statisticsCorrect && totalProcessedCorrect;
++
++    cout << testName << ": ";
++
++    if (testPassed) {
++        cout << "PASSED";
++    }
++    else {
++        cout << "FAILED"
++             << " | Очікувана сума: " << expectedAmount
++             << " | Фактична сума: " << actualAmount
++             << " | Оброблено кредитів: " << state.statistics.processedLoans;
++    }
++
++    cout << endl;
++
++    return testPassed;
++}
++
++// Перевірка відхилення невідомого типу кредиту
++bool testUnknownLoanType() {
++    LoanType type;
++
++    bool result = parseLoanType("UNKNOWN", type);
++    bool testPassed = !result;
++
++    cout << "TC16: ";
++
++    if (testPassed) {
++        cout << "PASSED";
++    }
++    else {
++        cout << "FAILED";
++    }
++
++    cout << endl;
++
++    return testPassed;
++}
++
++int main() {
++
++    SetConsoleCP(65001);
++    SetConsoleOutputCP(65001);
++    setlocale(LC_ALL, "Ukrainian_Ukraine.65001");
++
++    int totalTests = 16;
++    int passedTests = 0;
++
++    cout << "===== РЕГРЕСІЙНЕ ТЕСТУВАННЯ =====" << endl;
++
++    // TC01: Споживчий кредит без дострокового погашення та страхування
++    passedTests += runTest("TC01", {LoanType::Consumer, 50000, 18, 24, false, false}, 62158.92, 1);
++
++    // TC02: Іпотечний кредит
++    passedTests += runTest("TC02", {LoanType::Mortgage, 800000, 12, 120, false, false}, 1398821.10, 1);
++
++    // TC03: Автокредит
++    passedTests += runTest("TC03", {LoanType::Auto, 300000, 16, 60, false, false}, 452025.03, 1);
++
++    // TC04: Кредит з нульовою відсотковою ставкою
++    passedTests += runTest("TC04", {LoanType::Consumer, 12000, 0, 12, false, false}, 12920.00, 1);
++
++    // TC05: Споживчий кредит зі страхуванням
++    passedTests += runTest("TC05", {LoanType::Consumer, 50000, 18, 24, false, true}, 63408.92, 1);
++
++    // TC06: Іпотечний кредит з достроковим погашенням і страхуванням
++    passedTests += runTest("TC06", {LoanType::Mortgage, 800000, 12, 120, true, true}, 1386455.05, 1);
++
++    // TC07: Автокредит з достроковим погашенням
++    passedTests += runTest("TC07", {LoanType::Auto, 300000, 16, 60, true, false}, 431666.27, 1);
++
++    // TC08: Кредит на один місяць
++    passedTests += runTest("TC08", {LoanType::Consumer, 10000, 10, 1, false, false}, 10933.33, 1);
++
++    // TC09: Кредит на максимальний термін
++    passedTests += runTest("TC09", {LoanType::Mortgage, 500000, 10, 360, false, false}, 1594378.83, 1);
++
++    // TC10: Нульова сума кредиту
++    passedTests += runTest("TC10", {LoanType::Consumer, 0, 10, 12, false, false}, -1.0, 0);
++
++    // TC11: Від'ємна сума кредиту
++    passedTests += runTest("TC11", {LoanType::Consumer, -10000, 10, 12, false, false}, -1.0, 0);
++
++    // TC12: Від'ємна відсоткова ставка
++    passedTests += runTest("TC12", {LoanType::Consumer, 10000, -1, 12, false, false}, -1.0, 0);
++
++    // TC13: Відсоткова ставка понад 100%
++    passedTests += runTest("TC13", {LoanType::Consumer, 10000, 101, 12, false, false}, -1.0, 0);
++
++    // TC14: Нульовий термін кредитування
++    passedTests += runTest("TC14", {LoanType::Consumer, 10000, 10, 0, false, false}, -1.0, 0);
++
++    // TC15: Термін кредитування понад 360 місяців
++    passedTests += runTest("TC15", {LoanType::Consumer, 10000, 10, 361, false, false}, -1.0, 0);
++
++    // TC16: Невідомий тип кредиту
++    passedTests += testUnknownLoanType();
++
++    cout << "\n===== ПІДСУМКИ ТЕСТУВАННЯ =====" << endl;
++    cout << "Усього тестів: " << totalTests << endl;
++    cout << "Успішно: " << passedTests << endl;
++    cout << "Не пройдено: " << totalTests - passedTests << endl;
++
++    if (passedTests == totalTests) {
++        cout << "\nУсі регресійні тести пройдено успішно!" << endl;
++        return 0;
++    }
++
++    cout << "\nВиявлено помилки під час тестування!" << endl;
++    return 1;
++}
