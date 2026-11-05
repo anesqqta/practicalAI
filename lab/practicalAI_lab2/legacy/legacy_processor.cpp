@@ -1,181 +1,192 @@
 #include <iostream>
 #include <string>
 #include <iomanip>
-#include <clocale> 
-#include <windows.h>// Необхідно для підтримки української мови в консолі
+#include <clocale>
+#include <windows.h>
 
 using namespace std;
 
 // Глобальні змінні
-double insuranceRate = 0.025; // Базова ставка страхування
-double processingFee = 0.015; // Комісія за обробку
-double totalProcessed = 0.0;  // Загальна сума оброблених кредитів
-int processedLoans = 0;       // Кількість оброблених кредитів
-bool useInsurance = true;     // Чи використовувати страхування загалом
+double insuranceRate = 0.025;
+double processingFee = 0.015;
+double totalProcessed = 0.0;
+int processedLoans = 0;
+bool useInsurance = true;
 
-// Функція розрахунку параметрів кредиту
-double processLoan(string loanType, double amount, double annualRate, int months, bool earlyRepayment, bool insurance) {
-    double monthlyPayment = 0.0;
-    double totalInterest = 0.0;
-    double commission = 0.0;
-    double insuranceCost = 0.0;
-    double additionalFee = 0.0;
-    double totalAmount = 0.0;
-    double monthlyRate = annualRate / 12.0 / 100.0;
+// Параметри окремого типу кредиту
+struct LoanRules {
+    double commissionRate;
+    double amountThreshold;
+    double increasedCommissionRate;
 
-    // Валідація вхідних даних
+    double baseAdditionalFee;
+    double rateThreshold;
+    double rateAdditionalFee;
+
+    double insuranceMultiplier;
+
+    int serviceMonthsThreshold;
+    double serviceAdditionalFee;
+
+    double earlyRepaymentFactor;
+    double earlyRepaymentFee;
+};
+
+// Отримання параметрів відповідно до типу кредиту
+bool getLoanRules(const string& loanType, LoanRules& rules) {
+    if (loanType == "CONSUMER") {
+        rules = {
+            0.02, 100000, 0.025,
+            500,  20,     300,
+            1.0,  60,     250,
+            0.9,  200
+        };
+    }
+    else if (loanType == "MORTGAGE") {
+        rules = {
+            0.01, 1000000, 0.015,
+            1500, 15,      1000,
+            0.8,  120,     750,
+            0.95, 500
+        };
+    }
+    else if (loanType == "AUTO") {
+        rules = {
+            0.03, 500000, 0.035,
+            800,  18,     500,
+            1.2,  84,     400,
+            0.85, 300
+        };
+    }
+    else {
+        return false;
+    }
+
+    return true;
+}
+
+// Перевірка коректності вхідних даних
+bool validateLoanInput(double amount, double annualRate, int months) {
     if (amount <= 0) {
         cout << "Помилка: сума кредиту повинна бути додатною." << endl;
-        return -1;
+        return false;
     }
 
     if (annualRate < 0 || annualRate > 100) {
         cout << "Помилка: некоректна відсоткова ставка." << endl;
-        return -1;
+        return false;
     }
 
     if (months <= 0 || months > 360) {
         cout << "Помилка: некоректний термін кредитування." << endl;
-        return -1;
+        return false;
     }
 
-    if (loanType != "CONSUMER" && loanType != "MORTGAGE" && loanType != "AUTO") {
-        cout << "Помилка: невідомий тип кредиту." << endl;
-        return -1;
+    return true;
+}
+
+// Розрахунок початкової комісії та додаткових зборів
+void calculateLoanTypeFees(
+    const LoanRules& rules,
+    double amount,
+    double annualRate,
+    double& commission,
+    double& additionalFee
+) {
+    commission = amount * rules.commissionRate;
+    additionalFee = rules.baseAdditionalFee;
+
+    if (annualRate > rules.rateThreshold) {
+        additionalFee += rules.rateAdditionalFee;
     }
 
-    // Обробка логіки залежно від типу кредиту
-    if (loanType == "CONSUMER") {
-        commission = amount * 0.02;
-        additionalFee = 500;
-
-        if (annualRate > 20) {
-            additionalFee += 300;
-        }
-
-        if (amount > 100000) {
-            commission = amount * 0.025;
-        }
-    } 
-    else if (loanType == "MORTGAGE") {
-        commission = amount * 0.01;
-        additionalFee = 1500;
-
-        if (annualRate > 15) {
-            additionalFee += 1000;
-        }
-
-        if (amount > 1000000) {
-            commission = amount * 0.015;
-        }
-    } 
-    else if (loanType == "AUTO") {
-        commission = amount * 0.03;
-        additionalFee = 800;
-
-        if (annualRate > 18) {
-            additionalFee += 500;
-        }
-
-        if (amount > 500000) {
-            commission = amount * 0.035;
-        }
+    if (amount > rules.amountThreshold) {
+        commission = amount * rules.increasedCommissionRate;
     }
+}
 
-    // Розрахунок щомісячного платежу
+// Розрахунок щомісячного платежу
+double calculateMonthlyPayment(double amount, double monthlyRate, int months) {
     if (monthlyRate == 0) {
-        monthlyPayment = amount / months;
-    } 
-    else {
-        double coefficient = monthlyRate * (1 + monthlyRate);
-        double denominator = 1;
-
-        for (int i = 0; i < months - 1; i++) {
-            denominator *= (1 + monthlyRate);
-        }
-
-        double power = denominator * (1 + monthlyRate);
-        monthlyPayment = amount * monthlyRate * power / (power - 1);
+        return amount / months;
     }
 
-    totalInterest = monthlyPayment * months - amount;
+    double denominator = 1;
 
-    // Розрахунок страховки
+    for (int i = 0; i < months - 1; i++) {
+        denominator *= (1 + monthlyRate);
+    }
+
+    double power = denominator * (1 + monthlyRate);
+
+    return amount * monthlyRate * power / (power - 1);
+}
+
+// Розрахунок вартості страхування
+double calculateInsurance(const LoanRules& rules, double amount, bool insurance) {
     if (insurance && useInsurance) {
-        if (loanType == "CONSUMER") {
-            insuranceCost = amount * insuranceRate;
-        } 
-        else if (loanType == "MORTGAGE") {
-            insuranceCost = amount * insuranceRate * 0.8;
-        } 
-        else if (loanType == "AUTO") {
-            insuranceCost = amount * insuranceRate * 1.2;
-        }
+        return amount * insuranceRate * rules.insuranceMultiplier;
     }
 
-    // Розрахунок додаткових комісій за обслуговування терміну
-    if (loanType == "CONSUMER") {
-        commission += amount * processingFee;
+    return 0.0;
+}
 
-        if (months > 60) {
-            commission += 250;
-        }
-    } 
-    else if (loanType == "MORTGAGE") {
-        commission += amount * processingFee;
+// Комісія за обслуговування терміну кредиту
+void calculateServiceCommission(
+    const LoanRules& rules,
+    double amount,
+    int months,
+    double& commission
+) {
+    commission += amount * processingFee;
 
-        if (months > 120) {
-            commission += 750;
-        }
-    } 
-    else if (loanType == "AUTO") {
-        commission += amount * processingFee;
-
-        if (months > 84) {
-            commission += 400;
-        }
+    if (months > rules.serviceMonthsThreshold) {
+        commission += rules.serviceAdditionalFee;
     }
+}
 
-    // Обробка умов дострокового погашення
+// Обробка дострокового погашення
+void applyEarlyRepayment(
+    const LoanRules& rules,
+    bool earlyRepayment,
+    double& totalInterest,
+    double& additionalFee
+) {
     if (earlyRepayment) {
-        if (loanType == "CONSUMER") {
-            totalInterest *= 0.9;
-            additionalFee += 200;
-        } 
-        else if (loanType == "MORTGAGE") {
-            totalInterest *= 0.95;
-            additionalFee += 500;
-        } 
-        else if (loanType == "AUTO") {
-            totalInterest *= 0.85;
-            additionalFee += 300;
-        }
+        totalInterest *= rules.earlyRepaymentFactor;
+        additionalFee += rules.earlyRepaymentFee;
     }
+}
 
-    // Розрахунок фінальної суми до сплати
-    totalAmount = amount + totalInterest + commission + insuranceCost + additionalFee;
-
+// Виведення результатів розрахунку
+void printLoanResult(
+    const string& loanType,
+    double amount,
+    double monthlyPayment,
+    double totalInterest,
+    double commission,
+    double insuranceCost,
+    double additionalFee,
+    double totalAmount,
+    bool earlyRepayment
+) {
     if (totalAmount > amount * 2) {
         cout << "Увага: загальна вартість кредиту перевищує тіло кредиту вдвічі!" << endl;
     }
 
     if (insuranceCost > 0) {
         cout << "Страхування включено." << endl;
-    } 
+    }
     else {
         cout << "Страхування не включено." << endl;
     }
 
     if (earlyRepayment) {
         cout << "Застосовано опцію дострокового погашення." << endl;
-    } 
+    }
     else {
         cout << "Стандартні умови погашення." << endl;
     }
-
-    // Оновлення глобальної статистики
-    totalProcessed += totalAmount;
-    processedLoans++;
 
     cout << fixed << setprecision(2);
     cout << "\n----- РОЗРАХУНОК КРЕДИТУ -----" << endl;
@@ -187,17 +198,60 @@ double processLoan(string loanType, double amount, double annualRate, int months
     cout << "Страховка: " << insuranceCost << endl;
     cout << "Додаткові збори: " << additionalFee << endl;
     cout << "Загальна сума до сплати: " << totalAmount << endl;
+}
+
+// Основна функція обробки кредиту
+double processLoan(
+    string loanType,
+    double amount,
+    double annualRate,
+    int months,
+    bool earlyRepayment,
+    bool insurance
+) {
+    if (!validateLoanInput(amount, annualRate, months)) {
+        return -1;
+    }
+
+    LoanRules rules;
+
+    if (!getLoanRules(loanType, rules)) {
+        cout << "Помилка: невідомий тип кредиту." << endl;
+        return -1;
+    }
+
+    double commission = 0.0;
+    double insuranceCost = 0.0;
+    double additionalFee = 0.0;
+    double monthlyRate = annualRate / 12.0 / 100.0;
+
+    calculateLoanTypeFees(rules, amount, annualRate, commission, additionalFee);
+    
+    double monthlyPayment = calculateMonthlyPayment(amount, monthlyRate, months);
+    double totalInterest = monthlyPayment * months - amount;
+
+    insuranceCost = calculateInsurance(rules, amount, insurance);
+    calculateServiceCommission(rules, amount, months, commission);
+    applyEarlyRepayment(rules, earlyRepayment, totalInterest, additionalFee);
+
+    double totalAmount = amount + totalInterest + commission + insuranceCost + additionalFee;
+
+    totalProcessed += totalAmount;
+    processedLoans++;
+
+    printLoanResult(
+        loanType, amount, monthlyPayment, totalInterest,
+        commission, insuranceCost, additionalFee, totalAmount, earlyRepayment
+    );
 
     return totalAmount;
 }
 
 int main() {
-    // Встановлення української локалі для коректного виведення в консоль
-    // Повний запуск підтримки UTF-8 для Windows
+    // Встановлення української локалі для коректного виведення
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
     setlocale(LC_ALL, "Ukrainian_Ukraine.65001");
-
 
     cout << "=== СИСТЕМА РОЗРАХУНКУ КРЕДИТІВ ===" << endl;
 
@@ -233,7 +287,7 @@ int main() {
 
     if (result > 0) {
         cout << "\nРозрахунок завершено успішно." << endl;
-    } 
+    }
     else {
         cout << "\nПомилка розрахунку." << endl;
     }
