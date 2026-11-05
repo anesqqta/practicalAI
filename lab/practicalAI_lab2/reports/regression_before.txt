@@ -1,0 +1,25 @@
+﻿=== РЕГРЕСІЙНЕ ТЕСТУВАННЯ ===
+
+TC01 | PASSED | actual = 62158.92 | expected = 62158.92 | processedLoans = 1
+TC02 | PASSED | actual = 1398821.10 | expected = 1398821.10 | processedLoans = 1
+TC03 | PASSED | actual = 452025.03 | expected = 452025.03 | processedLoans = 1
+TC04 | PASSED | actual = 12920.00 | expected = 12920.00 | processedLoans = 1
+TC05 | PASSED | actual = 63408.92 | expected = 63408.92 | processedLoans = 1
+TC06 | PASSED | actual = 1386455.05 | expected = 1386455.05 | processedLoans = 1
+TC07 | PASSED | actual = 431666.27 | expected = 431666.27 | processedLoans = 1
+TC08 | PASSED | actual = 10933.33 | expected = 10933.33 | processedLoans = 1
+TC09 | PASSED | actual = 1594378.83 | expected = 1594378.83 | processedLoans = 1
+TC10 | PASSED | actual = -1.00 | expected = -1.00 | processedLoans = 0
+TC11 | PASSED | actual = -1.00 | expected = -1.00 | processedLoans = 0
+TC12 | PASSED | actual = -1.00 | expected = -1.00 | processedLoans = 0
+TC13 | PASSED | actual = -1.00 | expected = -1.00 | processedLoans = 0
+TC14 | PASSED | actual = -1.00 | expected = -1.00 | processedLoans = 0
+TC15 | PASSED | actual = -1.00 | expected = -1.00 | processedLoans = 0
+TC16 | PASSED | actual = -1.00 | expected = -1.00 | processedLoans = 0
+
+=== ПІДСУМКИ ТЕСТУВАННЯ ===
+Усього тестів: 16
+Успішно: 16
+Не пройдено: 0
+
+Усі регресійні тести пройдено успішно!
