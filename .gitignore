@@ -14,3 +14,9 @@ __pycache__/
 
 # Word documents
 *.docx 
+
+# Lab 3 build files
+lab/practicalAI_lab3/build/
+
+# Temporary Microsoft Word files
+~WRL*.tmp
