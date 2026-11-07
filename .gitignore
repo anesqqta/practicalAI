@@ -20,3 +20,6 @@ lab/practicalAI_lab3/build/
 
 # Temporary Microsoft Word files
 ~WRL*.tmp
+
+# Lab 4 build files
+lab/practicalAI_lab4/build/
